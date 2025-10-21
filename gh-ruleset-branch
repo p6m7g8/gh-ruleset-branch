@@ -1,0 +1,413 @@
+#!/usr/bin/env bash
+
+# shellcheck shell=bash
+
+######################################################################
+#<
+#
+# Function: p6_usage()
+#
+#  Args:
+#
+#  Environment:	 EOF LC_ALL NAME OPTIND RULE WHAT
+#>
+######################################################################
+p6_usage() {
+  local rc="${1:-0}"
+  local msg="${2:-}"
+
+  if [ -n "$msg" ]; then
+    echo >&2 "$msg"
+  fi
+  cat <<EOF
+Usage:
+  gh-ruleset-branch.zsh [options] <cmd> [<args>...]
+
+Commands:
+  activate <name>                Activate a branch ruleset
+  create <name>                  Create a branch ruleset
+  deactivate <name>              Deactivate a branch ruleset
+  delete <name>                  Delete a branch ruleset
+  show <name>                    Show a branch ruleset
+  update <name> <what>=<value>   Update a branch ruleset
+
+Options:
+  -h                             Show this help message
+
+Examples:
+  gh-ruleset-branch.zsh activate "My Ruleset"
+  gh-ruleset-branch.zsh create "My Ruleset"
+  gh-ruleset-branch.zsh deactivate "My Ruleset"
+  gh-ruleset-branch.zsh delete "My Rules"
+  gh-ruleset-branch.zsh show "My Ruleset"
+  gh-ruleset-branch.zsh update "My Ruleset" required_signatures=enabled
+  gh-ruleset-branch.zsh update "My Ruleset" required_status_checks=disabled merge_method=squash required_approving_review_count=2
+EOF
+  exit "$rc"
+}
+
+p6main() {
+  shift 0
+
+  # sanitize env
+  LC_ALL=C
+
+  # parse options
+  local flag
+  while getopts "h" flag; do
+    case $flag in
+    h) p6_usage 0 "help" ;;
+    *) p6_usage 1 "invalid flag" ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  # grab command
+  local cmd="$1"
+  shift 1
+
+  # security 101: only allow valid commands
+  case $cmd in
+  help) p6_usage ;;
+  activate) ;;
+  create) ;;
+  deactivate) ;;
+  delete) ;;
+  show) ;;
+  update) ;;
+  *) p6_usage 1 "invalid cmd" ;;
+  esac
+
+  # exit if any cli errors w/ >0 return code
+  # the commands can still disable locally if needed
+  set -e
+  p6_cmd_"${cmd}" "$@"
+  set +e
+
+  return 0
+}
+
+_jq_update() {
+  local json_file="$1"
+  local what="$2"
+  local update="$3"
+  local rule_fn="$4"
+
+  if [ "$update" = "enabled" ]; then
+    local rule="$($rule_fn)"
+    jq --argjson RULE "$rule" '.rules += [$RULE] | .rules |= unique_by(.type)' < /tmp/jq.foo
+  else
+    jq --arg WHAT "$what" '.rules |= map(select(.type != $WHAT))' < /tmp/jq.foo
+  fi
+}
+
+_gh() {
+
+  gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "$@"
+}
+
+_p6_ruleset_id_by_name() {
+  local name="$1"
+
+  _gh repos/:owner/:repo/rulesets | jq -r --arg NAME "$name" '.[] | select(.name==$NAME) | .id' | head -1
+}
+
+_json_conditions() {
+  local include="$1"
+  local exclude="$2"
+
+  cat <<EOF
+{
+  "conditions": {
+    "ref_name": {
+      "include": ["${include}"],
+      "exclude": ["${exclude}"]
+    }
+  }
+}
+EOF
+}
+
+_json_rule_required_signatures() {
+
+  cat <<EOF
+{
+  "type": "required_signatures"
+}
+EOF
+}
+
+_json_rule_non_fast_forward() {
+
+  cat <<EOF
+{
+  "type": "non_fast_forward"
+}
+EOF
+}
+
+_json_rule_required_linear_history() {
+
+  cat <<EOF
+{
+  "type": "required_linear_history"
+}
+EOF
+}
+
+_json_rule_update() {
+
+  cat <<EOF
+{
+  "type": "update"
+}
+EOF
+}
+
+_json_rule_copilot_code_review() {
+  local push="$1"
+  local draft="$2"
+
+  cat <<EOF
+{
+  "type": "copilot_code_review",
+  "parameters": {
+    "review_on_push": "${push}",
+    "review_draft_pull_requests": "${draft}"
+  }
+}
+EOF
+}
+
+_json_rule_required_status_checks() {
+  local context="$1"
+  local integration_id="$2"
+  local strict_required_status_checks_policy="$3"
+  local do_not_enforce_on_create="$4"
+
+  cat <<EOF
+{
+  "type": "required_status_checks",
+  "parameters": {
+    "strict_required_status_checks_policy": "${strict_required_status_checks_policy}",
+    "do_not_enforce_on_create": "${do_not_enforce_on_create}",
+    "required_status_checks": [
+      {
+        "context": "${context}",
+        "integration_id": "${integration_id}"
+      }
+    ]
+  }
+}
+EOF
+}
+
+_json_rule_pull_request() {
+  local required_approving_review_count="$1"
+  local dismiss_stale_reviews_on_push="$2"
+  local require_code_owner_review="$3"
+  local require_last_push_approval="$4"
+  local required_review_thread_resolution="$5"
+  local automatic_copilot_code_review_enabled="$6"
+  local allowed_merge_methods="$7"
+
+  cat <<EOF
+{
+  "type": "pull_request",
+  "parameters": {
+    "required_approving_review_count": "${required_approving_review_count}",
+    "dismiss_stale_reviews_on_push": "${dismiss_stale_reviews_on_push}",
+    "require_code_owner_review": "${require_code_owner_review}",
+    "require_last_push_approval": "${require_last_push_approval}",
+    "required_review_thread_resolution": "${required_review_thread_resolution}",
+    "automatic_copilot_code_review_enabled": "${automatic_copilot_code_review_enabled}",
+    "allowed_merge_methods": [${allowed_merge_methods}]
+  }
+}
+EOF
+}
+
+_json_rule_merge_queue() {
+  local merge_method="$1"
+  local max_entries_to_build="$2"
+  local min_entries_to_merge="$3"
+  local max_entries_to_merge="$4"
+  local min_entries_to_merge_wait_minutes="$5"
+  local grouping_strategy="$6"
+  local check_response_timeout_minutes="$7"
+
+  cat <<EOF
+{
+  "type": "merge_queue",
+  "parameters": {
+    "merge_method": "${merge_method}",
+    "max_entries_to_build": "${max_entries_to_build}",
+    "min_entries_to_merge": "${min_entries_to_merge}",
+    "max_entries_to_merge": "${max_entries_to_merge}",
+    "min_entries_to_merge_wait_minutes": "${min_entries_to_merge_wait_minutes}",
+    "grouping_strategy": "${grouping_strategy}",
+    "check_response_timeout_minutes": "${check_response_timeout_minutes}"
+  }
+}
+EOF
+}
+
+_json_meta() {
+  local name="$1"
+  local id="$2"
+
+  local id_json_clause
+  if [ -n "$id" ]; then
+    id_json_clause="\"id\": ${id},"
+  else
+    id_json_clause=""
+  fi
+
+  cat <<EOF
+{
+  ${id_json_clause}
+  "name":"${name}",
+  "target":"branch",
+  "enforcement":"active"
+}
+EOF
+
+  return
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_activate(name)
+#
+#  Args:
+#	name -
+#
+#  Environment:	 PUT
+#>
+######################################################################
+p6_cmd_activate() {
+  local name="$1"
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+ _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='active' 2>&1 | jq '{id,enforcement}'
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_deactivate(name)
+#
+#  Args:
+#	name -
+#
+#  Environment:	 PUT
+#>
+######################################################################
+p6_cmd_deactivate() {
+  local name="$1"
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+ _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='disabled' 2>&1 | jq '{id,enforcement}'
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_create(name)
+#
+#  Args:
+#	name -
+#
+#  Environment:	 POST
+#>
+######################################################################
+p6_cmd_create() {
+  local name="$1"
+
+  _gh --method POST repos/:owner/:repo/rulesets --input - $(_json_meta "$name") 2>&1 | jq '{id,name,enforcement}'
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_delete(name)
+#
+#  Args:
+#	name -
+#
+#  Environment:	 DELETE
+#>
+######################################################################
+p6_cmd_delete() {
+  local name="$1"
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+
+  _gh --method DELETE "repos/:owner/:repo/rulesets/${id}"
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_show(name)
+#
+#  Args:
+#	name -
+#
+#  Environment:	 GET
+#>
+######################################################################
+p6_cmd_show() {
+  local name="$1"
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+
+  _gh --method GET "repos/:owner/:repo/rulesets/${id}"
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_update(name, ...)
+#
+#  Args:
+#	name -
+#	... - 
+#
+#  Environment:	 PUT
+#>
+######################################################################
+p6_cmd_update() {
+  local name="$1"
+  shift 1
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+
+  local json_file="/tmp/jq.json"
+  local json_file_new="/tmp/jq-new.json"
+  p6_cmd_show | jq "{id, name, enforcement, target, conditions, rules}" > "$json_file"
+
+  local pair
+  for pair in "$@"; do
+    local what="${pair%%=*}"
+    local update="${pair#*=}"
+
+    local rule_fn="_json_rule_${what}"
+
+    rm -f "$json_file_new"
+    _jq_update "$json_file" "$what" "$update" "$rule_fn" > "$json_file_new"
+    rm -f "$json_file"
+
+    mv "$json_file_new" "$json_file"
+  done
+
+  _gh --verbose -i --method PUT "repos/:owner/:repo/rulesets/${id}" --input - < "$json_file"
+}
+
+p6main "$@"
