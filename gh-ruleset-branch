@@ -42,10 +42,20 @@ Examples:
   gh-ruleset-branch.zsh show "My Ruleset"
   gh-ruleset-branch.zsh update "My Ruleset" required_signatures=enabled
   gh-ruleset-branch.zsh update "My Ruleset" required_status_checks=disabled merge_method=squash required_approving_review_count=2
+  gh-ruleset-branch.zsh update "My Ruleset" pull_request.required_approving_review_count=2 pull_request.dismiss_stale_reviews_on_push=true
 EOF
   exit "$rc"
 }
 
+
+######################################################################
+#<
+#
+# Function: p6main()
+#
+#  Args:
+#>
+######################################################################
 p6main() {
   shift 0
 
@@ -94,11 +104,76 @@ _jq_update() {
   local rule_fn="$4"
 
   if [ "$update" = "enabled" ]; then
+    set -x
     local rule="$($rule_fn)"
-    jq --argjson RULE "$rule" '.rules += [$RULE] | .rules |= unique_by(.type)' < /tmp/jq.foo
+    set +x
+    jq --argjson RULE "$rule" '.rules += [$RULE] | .rules |= unique_by(.type)' < "$json_file"
   else
-    jq --arg WHAT "$what" '.rules |= map(select(.type != $WHAT))' < /tmp/jq.foo
+    jq --arg WHAT "$what" '.rules |= map(select(.type != $WHAT))' < "$json_file"
   fi
+}
+
+#############################################################################
+_jq_toggle_rule() {
+  local json_file="$1"
+  local rule="$2"
+  local state="$3"
+
+  local tmp="${json_file}.new"
+
+  if [ "$state" = "enabled" ]; then
+    local rule_json
+    rule_json=$(_json_rule_"$rule")
+    jq --arg R "$rule" --argjson RULE "$rule_json" \
+       '.rules = ((.rules // []) + [$RULE] | unique_by(.type))' \
+       < "$json_file" > "$tmp"
+  else
+    jq --arg R "$rule" \
+       '.rules = ((.rules // []) | map(select(.type != $R)))' \
+       < "$json_file" > "$tmp"
+  fi
+  mv "$tmp" "$json_file"
+}
+
+_jq_set_rule_params() {
+  local json_file="$1"
+  local rule="$2"
+  shift 2
+
+  # ensure skeleton exists with empty parameters
+  local tmp="${json_file}.new"
+  jq --arg R "pull_request" '
+   (
+     .rules = (.rules // [])
+     | if any(.rules[]; .type == $R)
+       then .
+       else .rules += [{"type": $R, "parameters": {}}]
+       end
+   )
+  ' < "$json_file" > "$tmp"
+  mv "$tmp" "$json_file"
+
+  # apply each k=v
+  local kv
+  for kv in "$@"; do
+    local k="${kv%%=*}"
+    local v="${kv#*=}"
+
+    if [[ "$v" =~ ^[0-9]+$ || "$v" == "true" || "$v" == "false" ]]; then
+      jq --arg R "$rule" --arg K "$k" --argjson V "$v" '
+        .rules |= map(if .type==$R
+                      then (.parameters = (.parameters // {})) | (.parameters[$K] = $V)
+                      else . end)
+      ' < "$json_file" > "$tmp"
+    else
+      jq --arg R "$rule" --arg K "$k" --arg V "$v" '
+        .rules |= map(if .type==$R
+                      then (.parameters = (.parameters // {})) | (.parameters[$K] = $V)
+                      else . end)
+      ' < "$json_file" > "$tmp"
+    fi
+    mv "$tmp" "$json_file"
+  done
 }
 
 _gh() {
@@ -291,7 +366,7 @@ p6_cmd_activate() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
- _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='active' 2>&1 | jq '{id,enforcement}'
+ _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='active' 2>&1 | jq '{id,name,enforcement}'
 }
 
 ######################################################################
@@ -310,7 +385,7 @@ p6_cmd_deactivate() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
- _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='disabled' 2>&1 | jq '{id,enforcement}'
+ _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='disabled' 2>&1 | jq '{id,name,enforcement}'
 }
 
 ######################################################################
@@ -327,7 +402,10 @@ p6_cmd_deactivate() {
 p6_cmd_create() {
   local name="$1"
 
-  _gh --method POST repos/:owner/:repo/rulesets --input - $(_json_meta "$name") 2>&1 | jq '{id,name,enforcement}'
+  local jf="/tmp/jf-create.json"
+  _json_meta "$name" > "$jf"
+   _gh --method POST repos/:owner/:repo/rulesets --input - <"$jf" 2>&1 | jq '{id,name,enforcement}'
+   rm -f "$jf"
 }
 
 ######################################################################
@@ -366,7 +444,6 @@ p6_cmd_show() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
-
   _gh --method GET "repos/:owner/:repo/rulesets/${id}"
 }
 
@@ -379,7 +456,7 @@ p6_cmd_show() {
 #	name -
 #	... - 
 #
-#  Environment:	 PUT
+#  Environment:	 GET PARAMS PUT
 #>
 ######################################################################
 p6_cmd_update() {
@@ -389,25 +466,41 @@ p6_cmd_update() {
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
 
-  local json_file="/tmp/jq.json"
-  local json_file_new="/tmp/jq-new.json"
-  p6_cmd_show | jq "{id, name, enforcement, target, conditions, rules}" > "$json_file"
+  local jf="/tmp/jq.json"
+  _gh --method GET "repos/:owner/:repo/rulesets/${id}" | jq '{id,name,enforcement,target,conditions,rules:(.rules//[])}' > "$jf"
 
-  local pair
-  for pair in "$@"; do
-    local what="${pair%%=*}"
-    local update="${pair#*=}"
+  # parse args: toggles (rule=enabled|disabled) and params (rule.key=value)
+  local arg
+  local rule
+  local key
+  local val
 
-    local rule_fn="_json_rule_${what}"
+  # collect per-rule params
+  declare -A PARAMS
+  while [ $# -gt 0 ]; do
+    arg="$1";
+    shift 1
 
-    rm -f "$json_file_new"
-    _jq_update "$json_file" "$what" "$update" "$rule_fn" > "$json_file_new"
-    rm -f "$json_file"
+    rule="${arg%%=*}"
+    val="${arg#*=}"
 
-    mv "$json_file_new" "$json_file"
+    if [[ "$rule" == *.* ]]; then
+      rule="${rule%%.*}"
+      key="${arg#*.}"
+      key="${key%%=*}"
+      PARAMS["$rule"]+="${PARAMS[$rule]:+ }$key=$val"
+    else
+      _jq_toggle_rule "$jf" "$rule" "$val"
+    fi
   done
 
-  _gh --verbose -i --method PUT "repos/:owner/:repo/rulesets/${id}" --input - < "$json_file"
+  # apply param sets
+  for rule in "${!PARAMS[@]}"; do
+    kvs=( ${PARAMS[$rule]} )
+    _jq_set_rule_params "$jf" "$rule" "${kvs[@]}"
+  done
+
+  _gh --method PUT "repos/:owner/:repo/rulesets/${id}" --input - < "$jf" | jq '{conditions,rules}'
 }
 
 p6main "$@"

@@ -3,6 +3,7 @@
         "ALLGREEN",
         "argjson",
         "Gollucci",
-        "Mergify"
+        "Mergify",
+        "shellcheck"
     ]
 }
