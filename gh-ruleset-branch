@@ -405,7 +405,7 @@ p6_cmd_update() {
     _jq_set_rule_params "$jf" "$rule" "${kvs[@]}"
   done
 
-  unset @PARAMS
+  unset PARAMS
 
   _gh --method PUT "repos/:owner/:repo/rulesets/${id}" --input - < "$jf" | jq '{conditions,rules}'
 }
