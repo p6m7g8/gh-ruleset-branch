@@ -401,7 +401,7 @@ p6_cmd_update() {
 
   # apply param sets
   for rule in "${!PARAMS[@]}"; do
-    kvs=( ${PARAMS[$rule]} )
+    read -r -a kvs <<< "${PARAMS[$rule]}"
     _jq_set_rule_params "$jf" "$rule" "${kvs[@]}"
   done
 
