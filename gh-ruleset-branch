@@ -294,7 +294,7 @@ p6_cmd_create() {
 
   local jf="/tmp/jf-create.json"
   _json_meta "$name" > "$jf"
-   _gh --method POST repos/:owner/:repo/rulesets --input - <"$jf" 2>&1 | jq '{id,name,enforcement}'
+   _gh --method POST repos/:owner/:repo/rulesets --input - <"$jf" 2>&1
    rm -f "$jf"
 }
 
