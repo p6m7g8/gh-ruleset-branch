@@ -38,6 +38,7 @@
 `gh-ruleset-branch` is a portable, GitHub CLI extension for managing **branch rulesets** directly from the command line.
 
 It wraps the [GitHub REST API v3](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28) for repository rulesets and exposes simple subcommands to:
+
 - create, show, activate, deactivate, or delete branch rulesets
 - toggle individual rule types (`required_signatures`, `non_fast_forward`, `merge_queue`, etc.)
 - set or modify parameters for multi-argument rules like `pull_request`, `merge_queue`, and `copilot_code_review`
@@ -77,13 +78,13 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 ### Commands
 
 | Command                        | Description |
-| ------------------------------ | -----------                 |
-| `activate <name>`              | Activate a branch ruleset |
-| `create <name>`                | Create a branch ruleset |
+| ------------------------------ | --------------------------- |
+| `activate <name>`              | Activate a branch ruleset   |
+| `create <name>`                | Create a branch ruleset     |
 | `deactivate <name>`            | Deactivate a branch ruleset |
-| `delete <name>`                | Delete a branch ruleset |
-| `show <name>`                  | Show a branch ruleset |
-| `update <name> <what>=<value>` | Update a branch ruleset |
+| `delete <name>`                | Delete a branch ruleset     |
+| `show <name>`                  | Show a branch ruleset       |
+| `update <name> <what>=<value>` | Update a branch ruleset.    |
 
 ### Options
 
@@ -206,4 +207,3 @@ See [Code of Conduct](https://github.com//.github/blob/main/CODE_OF_CONDUCT.md).
 ## Author
 
 **Philip M. Gollucci** <pgollucci@p6m7g8.com>
-
