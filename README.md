@@ -77,7 +77,7 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 
 ### Commands
 
-| Command                        | Description |
+| Command                        | Description                 |
 | ------------------------------ | --------------------------- |
 | `activate <name>`              | Activate a branch ruleset   |
 | `create <name>`                | Create a branch ruleset     |
