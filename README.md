@@ -30,8 +30,6 @@
 ## Badges
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-yellowgreen.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Mergify](https://img.shields.io/endpoint.svg?url=https://gh.mergify.io/badges//gh-ruleset-branch/&style=flat)](https://mergify.io)
-[![Gitpod ready-to-code](https://img.shields.io/badge/Gitpod-ready--to--code-blue?logo=gitpod)](https://gitpod.io/#https://github.com//gh-ruleset-branch)
 
 ---
 
@@ -50,15 +48,20 @@ It wraps the [GitHub REST API v3](https://docs.github.com/en/rest/repos/rules?ap
 ## Installation
 
 1. Ensure dependencies are installed:
+
    ```bash
    gh extension install p6m7g8/gh-ruleset-branch
    which jq gh
    ```
+
 2. Verify access:
+
    ```bash
    gh auth status
    ```
+
 3. Confirm the extension is working:
+
    ```bash
    gh ruleset-branch help
    ```
@@ -73,20 +76,20 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 
 ### Commands
 
-| Command | Description |
-|----------|-------------|
-| `activate <name>` | Activate a branch ruleset |
-| `create <name>` | Create a branch ruleset |
-| `deactivate <name>` | Deactivate a branch ruleset |
-| `delete <name>` | Delete a branch ruleset |
-| `show <name>` | Show a branch ruleset |
+| Command                        | Description |
+| ------------------------------ | -----------                 |
+| `activate <name>`              | Activate a branch ruleset |
+| `create <name>`                | Create a branch ruleset |
+| `deactivate <name>`            | Deactivate a branch ruleset |
+| `delete <name>`                | Delete a branch ruleset |
+| `show <name>`                  | Show a branch ruleset |
 | `update <name> <what>=<value>` | Update a branch ruleset |
 
 ### Options
 
-| Option | Description |
-|---------|-------------|
-| `-h` | Show help message |
+| Option  | Description       |
+| ------- | ----------------- |
+| `-h`    | Show help message |
 
 ---
 
@@ -102,14 +105,14 @@ alias ghrb="gh ruleset-branch"
 
 ### Functions
 
-| Function | Purpose |
-|-----------|----------|
-| `p6_usage()` | Prints help text |
-| `p6_cmd_activate(name)` | Activates a ruleset |
-| `p6_cmd_deactivate(name)` | Deactivates a ruleset |
-| `p6_cmd_create(name)` | Creates a new ruleset |
-| `p6_cmd_delete(name)` | Deletes a ruleset |
-| `p6_cmd_show(name)` | Shows JSON for a ruleset |
+| Function                   | Purpose                            |
+| -------------------------- | ---------------------------------- |
+| `p6_usage()`               | Prints help text                   |
+| `p6_cmd_activate(name)`    | Activates a ruleset                |
+| `p6_cmd_deactivate(name)`  | Deactivates a ruleset              |
+| `p6_cmd_create(name)`      | Creates a new ruleset              |
+| `p6_cmd_delete(name)`      | Deletes a ruleset                  |
+| `p6_cmd_show(name)`        | Shows JSON for a ruleset           |
 | `p6_cmd_update(name, ...)` | Updates or patches ruleset content |
 
 ---
