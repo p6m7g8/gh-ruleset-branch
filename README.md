@@ -189,11 +189,51 @@ gh ruleset-branch update default \
 ├── CODE_OF_CONDUCT.md
 ├── CONTRIBUTING.md
 ├── FUNDING
-├── init.zsh
 ├── LICENSE
 ├── README.md
 ├── SECURITY.md
-└── SUPPORT
+├── SUPPORT
+└── test/
+    ├── test_helper.bash
+    ├── fixtures/
+    └── unit/
+        └── helpers.bats
+```
+
+---
+
+## Testing
+
+This project uses [BATS](https://github.com/bats-core/bats-core) (Bash Automated Testing System) for testing.
+
+### Prerequisites
+
+Install BATS:
+
+```bash
+# macOS
+brew install bats-core
+
+# Ubuntu/Debian
+sudo apt-get install bats
+
+# From source
+git clone https://github.com/bats-core/bats-core.git
+cd bats-core
+./install.sh /usr/local
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+bats test/
+
+# Run unit tests only
+bats test/unit/
+
+# Run with verbose output
+bats --verbose-run test/
 ```
 
 ---
@@ -201,7 +241,7 @@ gh ruleset-branch update default \
 ## Contributing
 
 Pull requests are welcome.
-Please lint with `shellcheck`, test with `bash -n`.
+Please lint with `shellcheck`, test with `bash -n`, and run `bats test/`.
 
 See
 [How to Contribute](https://github.com//.github/blob/main/CONTRIBUTING.md).
