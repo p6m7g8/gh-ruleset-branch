@@ -1,0 +1,20 @@
+[
+  {
+    "id": 12345,
+    "name": "default",
+    "target": "branch",
+    "enforcement": "active"
+  },
+  {
+    "id": 12346,
+    "name": "feature-branches",
+    "target": "branch",
+    "enforcement": "disabled"
+  },
+  {
+    "id": 12347,
+    "name": "release-branches",
+    "target": "branch",
+    "enforcement": "active"
+  }
+]
