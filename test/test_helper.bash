@@ -28,12 +28,17 @@ mock_gh() {
 }
 
 # Mock _gh function for testing
+# Usage: mock__gh '{"json":"response"}'
 mock__gh() {
   local response="$1"
+  # Write response to a temp file that _gh will read
+  MOCK_GH_RESPONSE="$response"
+  export MOCK_GH_RESPONSE
+
+  # Redefine _gh to return mock response
   _gh() {
-    echo "$response"
+    echo "$MOCK_GH_RESPONSE"
   }
-  export -f _gh
 }
 
 # Create a temporary JSON file with content

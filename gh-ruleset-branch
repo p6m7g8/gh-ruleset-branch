@@ -28,13 +28,17 @@ Commands:
   create <name>                  Create a branch ruleset
   deactivate <name>              Deactivate a branch ruleset
   delete <name>                  Delete a branch ruleset
+  list                           List all branch rulesets
   show <name>                    Show a branch ruleset
   update <name> <what>=<value>   Update a branch ruleset
 
 Options:
   -h                             Show this help message
+  --json                         Output raw JSON (for list command)
 
 Examples:
+  gh-ruleset-branch.zsh list
+  gh-ruleset-branch.zsh list --json
   gh-ruleset-branch.zsh activate "My Ruleset"
   gh-ruleset-branch.zsh create "My Ruleset"
   gh-ruleset-branch.zsh deactivate "My Ruleset"
@@ -84,6 +88,7 @@ p6main() {
   create) ;;
   deactivate) ;;
   delete) ;;
+  list) ;;
   show) ;;
   update) ;;
   *) p6_usage 1 "invalid cmd" ;;
@@ -238,6 +243,43 @@ _p6_ruleset_id_by_name() {
   local name="$1"
 
   _gh repos/:owner/:repo/rulesets | jq -r --arg NAME "$name" '.[] | select(.name==$NAME) | .id' | head -1
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_list(...)
+#
+#  Args:
+#	... - optional --json flag
+#
+#  Environment:	 GET
+#>
+######################################################################
+p6_cmd_list() {
+  local json_output=false
+
+  # Parse arguments
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --json) json_output=true ;;
+      *) ;;
+    esac
+    shift
+  done
+
+  local result
+  result=$(_gh --method GET repos/:owner/:repo/rulesets)
+
+  if [ "$json_output" = "true" ]; then
+    echo "$result"
+  else
+    # Table format output
+    echo "$result" | jq -r '
+      ["ID", "NAME", "ENFORCEMENT", "TARGET"],
+      (.[] | [.id, .name, .enforcement, .target]) | @tsv
+    ' | column -t -s $'\t'
+  fi
 }
 
 ######################################################################
