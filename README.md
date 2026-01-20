@@ -95,10 +95,12 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 
 ### Options
 
-| Option   | Description                       |
-| -------- | --------------------------------- |
-| `-h`     | Show help message                 |
-| `--json` | Output raw JSON (for list command)|
+| Option      | Description                                      |
+| ----------- | ------------------------------------------------ |
+| `-h`        | Show help message                                |
+| `--json`    | Output raw JSON (for list command)               |
+| `--debug`   | Enable debug output (or set `GHRB_DEBUG=1`)      |
+| `--verbose` | Enable verbose API logging (or set `GHRB_VERBOSE=1`)|
 
 ---
 
