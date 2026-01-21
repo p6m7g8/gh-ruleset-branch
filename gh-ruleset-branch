@@ -10,6 +10,67 @@ GHRB_DEBUG="${GHRB_DEBUG:-0}"
 GHRB_VERBOSE="${GHRB_VERBOSE:-0}"
 GHRB_DRY_RUN="${GHRB_DRY_RUN:-0}"
 
+# Exit codes
+readonly EXIT_SUCCESS=0
+readonly EXIT_ERROR=1
+readonly EXIT_USAGE=2
+
+######################################################################
+#<
+#
+# Function: _error()
+#
+#  Args:
+#	message - error message to print
+#	exit_code - optional exit code (default: EXIT_ERROR)
+#>
+######################################################################
+_error() {
+  local message="$1"
+  local exit_code="${2:-$EXIT_ERROR}"
+
+  echo >&2 "Error: $message"
+  exit "$exit_code"
+}
+
+######################################################################
+#<
+#
+# Function: _require_arg()
+#
+#  Args:
+#	name - argument name for error message
+#	value - argument value to check
+#>
+######################################################################
+_require_arg() {
+  local name="$1"
+  local value="$2"
+
+  if [ -z "$value" ]; then
+    _error "Missing required argument: $name" "$EXIT_USAGE"
+  fi
+}
+
+######################################################################
+#<
+#
+# Function: _validate_ruleset_exists()
+#
+#  Args:
+#	name - ruleset name
+#	id - ruleset id (may be empty)
+#>
+######################################################################
+_validate_ruleset_exists() {
+  local name="$1"
+  local id="$2"
+
+  if [ -z "$id" ]; then
+    _error "Ruleset not found: '$name'. Use 'list' to see available rulesets."
+  fi
+}
+
 ######################################################################
 #<
 #
@@ -87,11 +148,11 @@ _verbose() {
 #>
 ######################################################################
 p6_usage() {
-  local rc="${1:-0}"
+  local rc="${1:-$EXIT_SUCCESS}"
   local msg="${2:-}"
 
   if [ -n "$msg" ]; then
-    echo >&2 "$msg"
+    echo >&2 "Error: $msg"
   fi
   cat <<EOF
 Usage:
@@ -167,21 +228,26 @@ p6main() {
   local flag
   while getopts "h" flag; do
     case $flag in
-    h) p6_usage 0 "help" ;;
-    *) p6_usage 1 "invalid flag" ;;
+    h) p6_usage "$EXIT_SUCCESS" ;;
+    *) p6_usage "$EXIT_USAGE" "Invalid flag: -$OPTARG" ;;
     esac
   done
   shift $((OPTIND - 1))
 
   # grab command
-  local cmd="$1"
+  local cmd="${1:-}"
+
+  if [ -z "$cmd" ]; then
+    p6_usage "$EXIT_USAGE" "No command specified"
+  fi
+
   shift 1
 
   _debug "Command: $cmd"
 
   # security 101: only allow valid commands
   case $cmd in
-  help) p6_usage ;;
+  help) p6_usage "$EXIT_SUCCESS" ;;
   activate) ;;
   create) ;;
   deactivate) ;;
@@ -189,7 +255,7 @@ p6main() {
   list) ;;
   show) ;;
   update) ;;
-  *) p6_usage 1 "invalid cmd" ;;
+  *) p6_usage "$EXIT_USAGE" "Unknown command: $cmd" ;;
   esac
 
   # exit if any cli errors w/ >0 return code
@@ -410,8 +476,11 @@ p6_cmd_list() {
 p6_cmd_activate() {
   local name="$1"
 
+  _require_arg "name" "$name"
+
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
 
   if _dry_run "Would activate ruleset '$name' (id: $id)"; then
     return 0
@@ -434,8 +503,11 @@ p6_cmd_activate() {
 p6_cmd_deactivate() {
   local name="$1"
 
+  _require_arg "name" "$name"
+
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
 
   if _dry_run "Would deactivate ruleset '$name' (id: $id)"; then
     return 0
@@ -457,6 +529,8 @@ p6_cmd_deactivate() {
 ######################################################################
 p6_cmd_create() {
   local name="$1"
+
+  _require_arg "name" "$name"
 
   if _dry_run "Would create ruleset '$name' with default settings"; then
     _json_meta "$name"
@@ -483,8 +557,11 @@ p6_cmd_create() {
 p6_cmd_delete() {
   local name="$1"
 
+  _require_arg "name" "$name"
+
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
 
   if _dry_run "Would delete ruleset '$name' (id: $id)"; then
     return 0
@@ -507,8 +584,12 @@ p6_cmd_delete() {
 p6_cmd_show() {
   local name="$1"
 
+  _require_arg "name" "$name"
+
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
+
   _gh --method GET "repos/:owner/:repo/rulesets/${id}"
 }
 
@@ -528,8 +609,11 @@ p6_cmd_update() {
   local name="$1"
   shift 1
 
+  _require_arg "name" "$name"
+
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
 
   local jf="/tmp/jq.json"
   _gh --method GET "repos/:owner/:repo/rulesets/${id}" | jq '{id,name,enforcement,target,conditions,rules:(.rules//[])}' > "$jf"

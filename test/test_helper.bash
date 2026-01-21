@@ -11,9 +11,16 @@ FIXTURES_DIR="$TEST_DIR/fixtures"
 # Source the main script functions without executing p6main
 # We do this by sourcing and then unsetting the auto-run
 source_script() {
-  # Create a modified version that doesn't auto-run
+  # Set exit codes before sourcing (in case readonly fails)
+  EXIT_SUCCESS=0
+  EXIT_ERROR=1
+  EXIT_USAGE=2
+
+  # Create a modified version that doesn't auto-run and removes readonly
   local tmp_script="/tmp/gh-ruleset-branch-test-$$"
-  sed 's/^p6main "\$@"$/# p6main "$@"/' "$PROJECT_ROOT/gh-ruleset-branch" > "$tmp_script"
+  sed -e 's/^p6main "\$@"$/# p6main "$@"/' \
+      -e 's/^readonly //' \
+      "$PROJECT_ROOT/gh-ruleset-branch" > "$tmp_script"
   source "$tmp_script"
   rm -f "$tmp_script"
 }
