@@ -5,9 +5,29 @@
 # Version
 GHRB_VERSION="0.2.0"
 
-# Global debug/verbose flags (can be set via environment)
+# Global debug/verbose/dry-run flags (can be set via environment)
 GHRB_DEBUG="${GHRB_DEBUG:-0}"
 GHRB_VERBOSE="${GHRB_VERBOSE:-0}"
+GHRB_DRY_RUN="${GHRB_DRY_RUN:-0}"
+
+######################################################################
+#<
+#
+# Function: _dry_run()
+#
+#  Args:
+#	action - description of what would be done
+#
+#  Environment:	 GHRB_DRY_RUN
+#>
+######################################################################
+_dry_run() {
+  if [ "$GHRB_DRY_RUN" = "1" ]; then
+    echo "[DRY-RUN] $*"
+    return 0
+  fi
+  return 1
+}
 
 ######################################################################
 #<
@@ -90,6 +110,7 @@ Options:
   -h, --help                     Show this help message
   --version                      Show version information
   --json                         Output raw JSON (for list command)
+  --dry-run                      Show what would be done without making changes
   --debug                        Enable debug output (or set GHRB_DEBUG=1)
   --verbose                      Enable verbose API logging (or set GHRB_VERBOSE=1)
 
@@ -124,12 +145,13 @@ p6main() {
   # sanitize env
   LC_ALL=C
 
-  # parse global options (--debug, --verbose, --version, --help) before getopts
+  # parse global options (--debug, --verbose, --dry-run, --version, --help) before getopts
   local args=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --debug) GHRB_DEBUG=1 ;;
       --verbose) GHRB_VERBOSE=1 ;;
+      --dry-run) GHRB_DRY_RUN=1 ;;
       --version) _version ;;
       --help) p6_usage 0 ;;
       *) args+=("$1") ;;
@@ -390,7 +412,12 @@ p6_cmd_activate() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
- _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='active' 2>&1 | jq '{id,name,enforcement}'
+
+  if _dry_run "Would activate ruleset '$name' (id: $id)"; then
+    return 0
+  fi
+
+  _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='active' 2>&1 | jq '{id,name,enforcement}'
 }
 
 ######################################################################
@@ -409,7 +436,12 @@ p6_cmd_deactivate() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
- _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='disabled' 2>&1 | jq '{id,name,enforcement}'
+
+  if _dry_run "Would deactivate ruleset '$name' (id: $id)"; then
+    return 0
+  fi
+
+  _gh --method PUT "repos/:owner/:repo/rulesets/${id}" -f enforcement='disabled' 2>&1 | jq '{id,name,enforcement}'
 }
 
 ######################################################################
@@ -426,10 +458,15 @@ p6_cmd_deactivate() {
 p6_cmd_create() {
   local name="$1"
 
+  if _dry_run "Would create ruleset '$name' with default settings"; then
+    _json_meta "$name"
+    return 0
+  fi
+
   local jf="/tmp/jf-create.json"
   _json_meta "$name" > "$jf"
-   _gh --method POST repos/:owner/:repo/rulesets --input - <"$jf" 2>&1
-   rm -f "$jf"
+  _gh --method POST repos/:owner/:repo/rulesets --input - <"$jf" 2>&1
+  rm -f "$jf"
 }
 
 ######################################################################
@@ -448,6 +485,10 @@ p6_cmd_delete() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
+
+  if _dry_run "Would delete ruleset '$name' (id: $id)"; then
+    return 0
+  fi
 
   _gh --method DELETE "repos/:owner/:repo/rulesets/${id}"
 }
@@ -541,7 +582,15 @@ p6_cmd_update() {
 
   unset PARAMS
 
+  if _dry_run "Would update ruleset '$name' (id: $id) with changes:"; then
+    echo "Proposed configuration:"
+    jq '{conditions,rules}' < "$jf"
+    rm -f "$jf"
+    return 0
+  fi
+
   _gh --method PUT "repos/:owner/:repo/rulesets/${id}" --input - < "$jf" | jq '{conditions,rules}'
+  rm -f "$jf"
 }
 
 p6main "$@"
