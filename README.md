@@ -89,14 +89,16 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 | `create <name>`                | Create a branch ruleset     |
 | `deactivate <name>`            | Deactivate a branch ruleset |
 | `delete <name>`                | Delete a branch ruleset     |
+| `list`                         | List all branch rulesets    |
 | `show <name>`                  | Show a branch ruleset       |
 | `update <name> <what>=<value>` | Update a branch ruleset     |
 
 ### Options
 
-| Option | Description       |
-| ------ | ----------------- |
-| `-h`   | Show help message |
+| Option   | Description                       |
+| -------- | --------------------------------- |
+| `-h`     | Show help message                 |
+| `--json` | Output raw JSON (for list command)|
 
 ---
 
@@ -117,12 +119,23 @@ alias ghrb="gh ruleset-branch"
 | `p6_cmd_deactivate(name)`    | Deactivates a ruleset              |
 | `p6_cmd_create(name)`        | Creates a new ruleset              |
 | `p6_cmd_delete(name)`        | Deletes a ruleset                  |
+| `p6_cmd_list()`              | Lists all rulesets                 |
 | `p6_cmd_show(name)`          | Shows JSON for a ruleset           |
 | `p6_cmd_update(name, ...)`   | Updates or patches ruleset content |
 
 ---
 
 ## Examples
+
+### List all rulesets
+
+```bash
+# Table format
+gh ruleset-branch list
+
+# JSON format
+gh ruleset-branch list --json
+```
 
 ### Create a new ruleset
 
