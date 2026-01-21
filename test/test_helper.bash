@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 
+# shellcheck shell=bash
+
 # Test helper for BATS tests
 # Provides common setup and utilities
 
 # Get the directory containing this script
 TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$TEST_DIR/.." && pwd)"
+# shellcheck disable=SC2034
 FIXTURES_DIR="$TEST_DIR/fixtures"
 
 # Source the main script functions without executing p6main
 # We do this by sourcing and then unsetting the auto-run
 source_script() {
   # Set exit codes before sourcing (in case readonly fails)
+  # shellcheck disable=SC2034
   EXIT_SUCCESS=0
+  # shellcheck disable=SC2034
   EXIT_ERROR=1
+  # shellcheck disable=SC2034
   EXIT_USAGE=2
 
   # Create a modified version that doesn't auto-run and removes readonly
@@ -21,11 +27,13 @@ source_script() {
   sed -e 's/^p6main "\$@"$/# p6main "$@"/' \
       -e 's/^readonly //' \
       "$PROJECT_ROOT/gh-ruleset-branch" > "$tmp_script"
+  # shellcheck source=/dev/null
   source "$tmp_script"
   rm -f "$tmp_script"
 }
 
 # Mock gh command for testing
+# shellcheck disable=SC2329
 mock_gh() {
   local response="$1"
   gh() {
@@ -36,6 +44,7 @@ mock_gh() {
 
 # Mock _gh function for testing
 # Usage: mock__gh '{"json":"response"}'
+# shellcheck disable=SC2329
 mock__gh() {
   local response="$1"
   # Write response to a temp file that _gh will read

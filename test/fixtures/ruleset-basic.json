@@ -1,0 +1,30 @@
+{
+  "id": 12345,
+  "name": "default",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "p6m7g8/gh-ruleset-branch",
+  "enforcement": "active",
+  "node_id": "abc123",
+  "conditions": {
+    "ref_name": {
+      "include": ["~DEFAULT_BRANCH"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "required_signatures"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 1,
+        "dismiss_stale_reviews_on_push": true
+      }
+    }
+  ],
+  "created_at": "2024-01-01T00:00:00Z",
+  "updated_at": "2024-01-02T00:00:00Z",
+  "_links": {}
+}
