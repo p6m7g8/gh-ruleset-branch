@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+# Test helper for BATS tests
+# Provides common setup and utilities
+
+# Get the directory containing this script
+TEST_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$TEST_DIR/.." && pwd)"
+FIXTURES_DIR="$TEST_DIR/fixtures"
+
+# Source the main script functions without executing p6main
+# We do this by sourcing and then unsetting the auto-run
+source_script() {
+  # Create a modified version that doesn't auto-run
+  local tmp_script="/tmp/gh-ruleset-branch-test-$$"
+  sed 's/^p6main "\$@"$/# p6main "$@"/' "$PROJECT_ROOT/gh-ruleset-branch" > "$tmp_script"
+  source "$tmp_script"
+  rm -f "$tmp_script"
+}
+
+# Mock gh command for testing
+mock_gh() {
+  local response="$1"
+  gh() {
+    echo "$response"
+  }
+  export -f gh
+}
+
+# Mock _gh function for testing
+mock__gh() {
+  local response="$1"
+  _gh() {
+    echo "$response"
+  }
+  export -f _gh
+}
+
+# Create a temporary JSON file with content
+create_temp_json() {
+  local content="$1"
+  local tmp_file="/tmp/test-json-$$.json"
+  echo "$content" > "$tmp_file"
+  echo "$tmp_file"
+}
+
+# Clean up temporary files
+cleanup_temp_files() {
+  rm -f /tmp/test-json-$$.json /tmp/test-json-$$.json.new
+  rm -f /tmp/gh-ruleset-branch-test-$$
+}
+
+# Setup function called before each test
+setup() {
+  source_script
+}
+
+# Teardown function called after each test
+teardown() {
+  cleanup_temp_files
+}
