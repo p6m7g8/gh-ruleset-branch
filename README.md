@@ -83,15 +83,17 @@ gh-ruleset-branch.zsh [options] <cmd> [<args>...]
 
 ### Commands
 
-| Command                        | Description                 |
-| ------------------------------ | --------------------------- |
-| `activate <name>`              | Activate a branch ruleset   |
-| `create <name>`                | Create a branch ruleset     |
-| `deactivate <name>`            | Deactivate a branch ruleset |
-| `delete <name>`                | Delete a branch ruleset     |
-| `list`                         | List all branch rulesets    |
-| `show <name>`                  | Show a branch ruleset       |
-| `update <name> <what>=<value>` | Update a branch ruleset     |
+| Command                        | Description                       |
+| ------------------------------ | --------------------------------- |
+| `activate <name>`              | Activate a branch ruleset         |
+| `create <name>`                | Create a branch ruleset           |
+| `deactivate <name>`            | Deactivate a branch ruleset       |
+| `delete <name>`                | Delete a branch ruleset           |
+| `export <name>`                | Export a branch ruleset as JSON   |
+| `import`                       | Import a branch ruleset from JSON |
+| `list`                         | List all branch rulesets          |
+| `show <name>`                  | Show a branch ruleset             |
+| `update <name> <what>=<value>` | Update a branch ruleset           |
 
 ### Options
 
@@ -123,6 +125,8 @@ alias ghrb="gh ruleset-branch"
 | `p6_cmd_deactivate(name)`    | Deactivates a ruleset              |
 | `p6_cmd_create(name)`        | Creates a new ruleset              |
 | `p6_cmd_delete(name)`        | Deletes a ruleset                  |
+| `p6_cmd_export(name)`        | Exports a ruleset as JSON          |
+| `p6_cmd_import()`            | Imports a ruleset from JSON stdin  |
 | `p6_cmd_list()`              | Lists all rulesets                 |
 | `p6_cmd_show(name)`          | Shows JSON for a ruleset           |
 | `p6_cmd_update(name, ...)`   | Updates or patches ruleset content |
@@ -164,6 +168,23 @@ gh ruleset-branch deactivate default
 
 ```bash
 gh ruleset-branch delete default
+```
+
+### Export and import
+
+```bash
+# Export a ruleset to a file
+gh ruleset-branch export default > ruleset.json
+
+# Import a ruleset from a file
+gh ruleset-branch import < ruleset.json
+
+# Clone a ruleset to another repository
+gh ruleset-branch export default | \
+  (cd ../other-repo && gh ruleset-branch import)
+
+# Preview import with dry-run
+gh ruleset-branch import --dry-run < ruleset.json
 ```
 
 ### Update simple toggles

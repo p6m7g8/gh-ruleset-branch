@@ -163,6 +163,8 @@ Commands:
   create <name>                  Create a branch ruleset
   deactivate <name>              Deactivate a branch ruleset
   delete <name>                  Delete a branch ruleset
+  export <name>                  Export a branch ruleset as JSON
+  import                         Import a branch ruleset from JSON (stdin)
   list                           List all branch rulesets
   show <name>                    Show a branch ruleset
   update <name> <what>=<value>   Update a branch ruleset
@@ -183,6 +185,8 @@ Examples:
   gh-ruleset-branch.zsh deactivate "My Ruleset"
   gh-ruleset-branch.zsh delete "My Rules"
   gh-ruleset-branch.zsh show "My Ruleset"
+  gh-ruleset-branch.zsh export "My Ruleset" > ruleset.json
+  gh-ruleset-branch.zsh import < ruleset.json
   gh-ruleset-branch.zsh update "My Ruleset" required_signatures=enabled
   gh-ruleset-branch.zsh update "My Ruleset" required_status_checks=disabled merge_method=squash required_approving_review_count=2
   gh-ruleset-branch.zsh update "My Ruleset" pull_request.required_approving_review_count=2 pull_request.dismiss_stale_reviews_on_push=true
@@ -252,6 +256,8 @@ p6main() {
   create) ;;
   deactivate) ;;
   delete) ;;
+  export) ;;
+  import) ;;
   list) ;;
   show) ;;
   update) ;;
@@ -591,6 +597,73 @@ p6_cmd_show() {
   _validate_ruleset_exists "$name" "$id"
 
   _gh --method GET "repos/:owner/:repo/rulesets/${id}"
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_export(name)
+#
+#  Args:
+#	name - ruleset name
+#
+#  Environment:	 GET
+#>
+######################################################################
+p6_cmd_export() {
+  local name="$1"
+
+  _require_arg "name" "$name"
+
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+  _validate_ruleset_exists "$name" "$id"
+
+  _debug "Exporting ruleset '$name' (id: $id)"
+
+  # Export ruleset without id field (id is repository-specific)
+  _gh --method GET "repos/:owner/:repo/rulesets/${id}" | \
+    jq 'del(.id) | del(.source) | del(.source_type) | del(.node_id) | del(.created_at) | del(.updated_at) | del(._links)'
+}
+
+######################################################################
+#<
+#
+# Function: p6_cmd_import()
+#
+#  Args:
+#	(reads from stdin)
+#
+#  Environment:	 POST
+#>
+######################################################################
+p6_cmd_import() {
+  local json_input
+
+  # Read JSON from stdin
+  if ! json_input=$(cat); then
+    _error "Failed to read JSON from stdin"
+  fi
+
+  # Validate JSON
+  if ! echo "$json_input" | jq empty 2>/dev/null; then
+    _error "Invalid JSON input"
+  fi
+
+  # Extract name for logging
+  local name
+  name=$(echo "$json_input" | jq -r '.name // "unnamed"')
+
+  _debug "Importing ruleset '$name'"
+
+  if _dry_run "Would import ruleset '$name' from JSON"; then
+    echo "Proposed configuration:"
+    echo "$json_input" | jq .
+    return 0
+  fi
+
+  # Create the ruleset
+  echo "$json_input" | _gh --method POST repos/:owner/:repo/rulesets --input -
 }
 
 ######################################################################
