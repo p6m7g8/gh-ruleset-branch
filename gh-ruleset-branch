@@ -2,9 +2,25 @@
 
 # shellcheck shell=bash
 
+# Version
+GHRB_VERSION="0.2.0"
+
 # Global debug/verbose flags (can be set via environment)
 GHRB_DEBUG="${GHRB_DEBUG:-0}"
 GHRB_VERBOSE="${GHRB_VERBOSE:-0}"
+
+######################################################################
+#<
+#
+# Function: _version()
+#
+#  Environment:	 GHRB_VERSION
+#>
+######################################################################
+_version() {
+  echo "gh-ruleset-branch version $GHRB_VERSION"
+  exit 0
+}
 
 ######################################################################
 #<
@@ -71,7 +87,8 @@ Commands:
   update <name> <what>=<value>   Update a branch ruleset
 
 Options:
-  -h                             Show this help message
+  -h, --help                     Show this help message
+  --version                      Show version information
   --json                         Output raw JSON (for list command)
   --debug                        Enable debug output (or set GHRB_DEBUG=1)
   --verbose                      Enable verbose API logging (or set GHRB_VERBOSE=1)
@@ -107,12 +124,14 @@ p6main() {
   # sanitize env
   LC_ALL=C
 
-  # parse global options (--debug, --verbose) before getopts
+  # parse global options (--debug, --verbose, --version, --help) before getopts
   local args=()
   while [ $# -gt 0 ]; do
     case "$1" in
       --debug) GHRB_DEBUG=1 ;;
       --verbose) GHRB_VERBOSE=1 ;;
+      --version) _version ;;
+      --help) p6_usage 0 ;;
       *) args+=("$1") ;;
     esac
     shift
