@@ -163,6 +163,7 @@ Commands:
   create <name>                  Create a branch ruleset
   deactivate <name>              Deactivate a branch ruleset
   delete <name>                  Delete a branch ruleset
+  ensure <name>                  Ensure ruleset matches JSON from stdin (create or update)
   export <name>                  Export a branch ruleset as JSON
   import                         Import a branch ruleset from JSON (stdin)
   list                           List all branch rulesets
@@ -184,6 +185,8 @@ Examples:
   gh-ruleset-branch.zsh create "My Ruleset"
   gh-ruleset-branch.zsh deactivate "My Ruleset"
   gh-ruleset-branch.zsh delete "My Rules"
+  gh-ruleset-branch.zsh ensure "My Ruleset" < ruleset.json
+  gh-ruleset-branch.zsh export "My Ruleset" > ruleset.json
   gh-ruleset-branch.zsh show "My Ruleset"
   gh-ruleset-branch.zsh export "My Ruleset" > ruleset.json
   gh-ruleset-branch.zsh import < ruleset.json
@@ -256,6 +259,7 @@ p6main() {
   create) ;;
   deactivate) ;;
   delete) ;;
+  ensure) ;;
   export) ;;
   import) ;;
   list) ;;
@@ -767,3 +771,69 @@ p6_cmd_update() {
 }
 
 p6main "$@"
+
+######################################################################
+#<
+#
+# Function: p6_cmd_ensure(name)
+#
+#  Args:
+#	name - ruleset name
+#	(reads JSON from stdin)
+#
+#  Environment:	 POST PUT GET
+#>
+######################################################################
+p6_cmd_ensure() {
+  local name="$1"
+
+  _require_arg "name" "$name"
+
+  local json_input
+
+  # Read JSON from stdin
+  if ! json_input=$(cat); then
+    _error "Failed to read JSON from stdin"
+  fi
+
+  # Validate JSON
+  if ! echo "$json_input" | jq empty 2>/dev/null; then
+    _error "Invalid JSON input"
+  fi
+
+  # Override name in JSON with provided name
+  json_input=$(echo "$json_input" | jq --arg NAME "$name" '.name = $NAME')
+
+  # Check if ruleset exists
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+
+  if [ -z "$id" ]; then
+    # Ruleset doesn't exist, create it
+    _debug "Ruleset '$name' does not exist, creating from JSON"
+
+    if _dry_run "Would create ruleset '$name' from JSON"; then
+      echo "Proposed configuration:"
+      echo "$json_input" | jq .
+      return 0
+    fi
+
+    echo "$json_input" | _gh --method POST repos/:owner/:repo/rulesets --input -
+    echo "Ruleset '$name' created successfully" >&2
+  else
+    # Ruleset exists, update it
+    _debug "Ruleset '$name' exists (id: $id), updating from JSON"
+
+    # Add id to JSON for update
+    json_input=$(echo "$json_input" | jq --arg ID "$id" '.id = ($ID | tonumber)')
+
+    if _dry_run "Would update ruleset '$name' (id: $id) from JSON"; then
+      echo "Proposed configuration:"
+      echo "$json_input" | jq .
+      return 0
+    fi
+
+    echo "$json_input" | _gh --method PUT "repos/:owner/:repo/rulesets/${id}" --input -
+    echo "Ruleset '$name' updated successfully" >&2
+  fi
+}
