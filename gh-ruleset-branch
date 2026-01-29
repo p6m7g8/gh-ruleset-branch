@@ -530,13 +530,23 @@ p6_cmd_deactivate() {
 #  Args:
 #	name -
 #
-#  Environment:	 POST
+#  Environment:	 POST GET
 #>
 ######################################################################
 p6_cmd_create() {
   local name="$1"
 
   _require_arg "name" "$name"
+
+  # Check if ruleset already exists (idempotent)
+  local id
+  id="$(_p6_ruleset_id_by_name "$name")"
+
+  if [ -n "$id" ]; then
+    echo "Ruleset '$name' already exists with id $id (idempotent)" >&2
+    _gh --method GET "repos/:owner/:repo/rulesets/${id}" 2>&1 | jq '{id,name,enforcement}'
+    return 0
+  fi
 
   if _dry_run "Would create ruleset '$name' with default settings"; then
     _json_meta "$name"
@@ -557,7 +567,7 @@ p6_cmd_create() {
 #  Args:
 #	name -
 #
-#  Environment:	 DELETE
+#  Environment:	 DELETE GET
 #>
 ######################################################################
 p6_cmd_delete() {
@@ -567,13 +577,19 @@ p6_cmd_delete() {
 
   local id
   id="$(_p6_ruleset_id_by_name "$name")"
-  _validate_ruleset_exists "$name" "$id"
+
+  # Check if ruleset exists (idempotent)
+  if [ -z "$id" ]; then
+    echo "Ruleset '$name' does not exist (idempotent - already deleted)" >&2
+    return 0
+  fi
 
   if _dry_run "Would delete ruleset '$name' (id: $id)"; then
     return 0
   fi
 
   _gh --method DELETE "repos/:owner/:repo/rulesets/${id}"
+  echo "Ruleset '$name' deleted successfully" >&2
 }
 
 ######################################################################
